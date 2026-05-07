@@ -18,7 +18,7 @@ pub struct LenientMetadata {
     pub subjects: Vec<String>,
     pub types: Vec<String>,
     pub last_modified: Option<String>,
-    pub cover_image: Option<String>,
+    pub(crate) cover_image: Option<String>,
     pub parse_warnings: Vec<MetadataError>,
 }
 
@@ -114,7 +114,6 @@ pub struct StrictMetadata {
     pub subjects: Vec<String>,
     pub types: Vec<String>,
     pub last_modified: String,
-    pub cover_image: Option<String>,
 }
 
 impl TryFrom<LenientMetadata> for StrictMetadata {
@@ -140,7 +139,6 @@ impl TryFrom<LenientMetadata> for StrictMetadata {
                 sources: lenient.sources,
                 subjects: lenient.subjects,
                 types: lenient.types,
-                cover_image: lenient.cover_image,
                 last_modified: lenient.last_modified.unwrap(),
             })
         }

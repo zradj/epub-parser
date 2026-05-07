@@ -13,6 +13,7 @@ use crate::{
 pub struct Book {
     pub metadata: LenientMetadata,
     pub spine: Vec<SpineItem>,
+    cover_image: Option<String>,
     resources: HashMap<String, Resource>,
 }
 
@@ -57,6 +58,28 @@ impl Book {
             metadata = LenientMetadata::from(&meta_node);
         }
 
+        let mut cover_image = metadata
+            .cover_image
+            .as_ref()
+            .map(|c| normalize_zip_path(&package_path, &c));
+
+        if cover_image.is_none() || archive.by_name(&cover_image.as_ref().unwrap()).is_err() {
+            let cover_image_node = root_element.children().find(|c| {
+                matches!(c.attribute("properties"), Some("cover-image"))
+                    || matches!(c.attribute("id"), Some("cover-image"))
+            });
+
+            match cover_image_node {
+                Some(node) => {
+                    node
+                        .attribute("href")
+                        .map(|href| normalize_zip_path(&package_path, href))
+                        .filter(|href| archive.by_name(href).is_ok())
+                        .unwrap_or_else(|| cover_image = None; ());
+                }
+            }
+        }
+
         let manifest_node = root_element
             .children()
             .find(|c| c.has_tag_name("manifest"))
@@ -80,6 +103,7 @@ impl Book {
         Ok(Book {
             metadata,
             spine,
+            cover_image,
             resources,
         })
     }
@@ -90,11 +114,7 @@ impl Book {
             .ok_or(EpubError::ResourceNotFound(String::from(path)))
     }
 
-    pub fn relative_resource(
-        &self,
-        current_doc_path: &str,
-        href: &str,
-    ) -> EpubResult<&Resource> {
+    pub fn relative_resource(&self, current_doc_path: &str, href: &str) -> EpubResult<&Resource> {
         if href.starts_with('/') || href.contains("://") {
             return self.resource(href);
         }
@@ -165,6 +185,7 @@ impl Book {
                     path,
                     Resource {
                         media_type: media_type.parse().unwrap(),
+                        properties: child.attribute("properties").map(String::from),
                         content: buf,
                     },
                 );
@@ -213,6 +234,7 @@ impl Book {
 #[derive(Debug)]
 pub struct Resource {
     pub media_type: MediaType,
+    pub properties: Option<String>,
     pub content: Vec<u8>,
 }
 
